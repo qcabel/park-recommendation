@@ -1,0 +1,6 @@
+fetch_id.sh
+runlogs/
+.idea/
+__pycache__/
+*.pkl
+*.pyc
