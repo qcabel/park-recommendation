@@ -10,6 +10,7 @@ return placeID and (maybe) whether this place contain time information
 """
 
 import calendar
+import sqlite3
 import datetime
 import json
 import logging
@@ -45,7 +46,7 @@ class PopulartimesException(Exception):
         self.message = message
 
 
-def get(api_key, types, p1, p2, n_threads=20, radius=180, all_places=False):
+def get(api_key, types, p1, p2, n_threads=20, radius=180, all_places=False, mock=False):
     """
     :param api_key: str; api key from google places web service
     :param types: [str]; placetypes
@@ -74,10 +75,87 @@ def get(api_key, types, p1, p2, n_threads=20, radius=180, all_places=False):
         }
     }
 
-    return run(params)
+    return run_all(params, mock=mock)
 
 
-def run(params):
+def scan_into_db(db_path, api_key, types, p1, p2, n_threads=20, radius=180, mock=False):
+    """
+    :param api_key: str; api key from google places web service
+    :param types: [str]; placetypes
+    :param p1: (float, float); lat/lng of the south-west delimiting point
+    :param p2: (float, float); lat/lng of the north-east delimiting point
+    :param n_threads: int; number of threads to use
+    :param radius: int; meters;
+    :param all_places: bool; include/exclude places without populartimes
+    :return: see readme
+    """
+    params = {
+        "API_key": api_key,
+        "radius": radius,
+        "type": types,
+        "n_threads": n_threads,
+        "bounds": {
+            "lower": {
+                "lat": min(p1[0], p2[0]),
+                "lng": min(p1[1], p2[1])
+            },
+            "upper": {
+                "lat": max(p1[0], p2[0]),
+                "lng": max(p1[1], p2[1])
+            }
+        }
+    }
+
+    return run_sqlite(db_path, params, mock=mock)
+
+
+def run_sqlite(db_path, params, mock=False):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    bounds = params["bounds"]
+
+    logging.info("Creating database 'places'...")
+    cur.execute('''CREATE TABLE places (id text, name text, data blob)''')
+
+    start = datetime.datetime.now()
+    i = 0
+    for lat, lng in get_circle_centers([bounds["lower"]["lat"], bounds["lower"]["lng"]],  # southwest
+                                       [bounds["upper"]["lat"], bounds["upper"]["lng"]],  # northeast
+                                       params["radius"]):
+        if not mock:
+            sleep(0.5)
+            # all places found in the current circle (using the nearly API)
+            circle_places = get_radar(params, {
+                "pos": (lat, lng),
+                "res": 0
+            })
+            logging.info(f"{len(circle_places)} places found for {lat}, {lng}")
+
+            # insert this batch into SQLite
+            to_insert_values = [(x['place_id'], x['name'], json.dumps(x))
+                                for x in circle_places.values()]
+            cur.executemany('''INSERT INTO places VALUES (?, ?, ?)''', to_insert_values)
+
+            conn.commit()
+
+        i += 1
+
+    if mock:
+        logging.info(f"Mock run finished with {i} circles")
+    else:
+        logging.info("Finished in: {}".format(str(datetime.datetime.now() - start)))
+
+    conn.close()
+
+
+def run_all(params, mock=False):
+    """
+    Run radar scanning and return all places in one output.
+    :param params:
+    :param mock:
+    :return:
+    """
     start = datetime.datetime.now()
     g_places = {}
 
@@ -86,21 +164,23 @@ def run(params):
     for lat, lng in get_circle_centers([bounds["lower"]["lat"], bounds["lower"]["lng"]],  # southwest
                                        [bounds["upper"]["lat"], bounds["upper"]["lng"]],  # northeast
                                        params["radius"]):
-        logging.info(f"Fetching places for {lat}, {lng}")
-        # all places found in the current circle (using the nearly API)
-        circle_places = get_radar(params, {
-            "pos": (lat, lng),
-            "res": 0
-        })
-        logging.info(f"{len(circle_places)} places found for {lat}, {lng}")
+        if not mock:
+            logging.info(f"Fetching places for {lat}, {lng}")
+            sleep(0.5)
+            # all places found in the current circle (using the nearly API)
+            circle_places = get_radar(params, {
+                "pos": (lat, lng),
+                "res": 0
+            })
+            logging.info(f"{len(circle_places)} places found for {lat}, {lng}")
 
-        # add the places found in this circle to all places for the given bounding box
-        g_places.update(circle_places)
+            # add the places found in this circle to all places for the given bounding box
+            g_places.update(circle_places)
+
         i += 1
 
-        # if i > 5:
-        #    break
-
+    if mock:
+        logging.info(f"Mock run finished with {i} circles")
 
     logging.info("Finished in: {}".format(str(datetime.datetime.now() - start)))
 
@@ -292,7 +372,8 @@ def get_radar(params, item):
 
     item["res"] += len(radar)
     if item["res"] >= 60:
-        logging.warning("Result limit in search radius reached, some data may get lost")
+        logging.warning(
+            f"Result limit in search radius [{_lat}, {_lng}, {params['radius']}] reached, some data may get lost")
 
     bounds = params["bounds"]
 
