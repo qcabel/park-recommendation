@@ -9,18 +9,11 @@ return placeID and (maybe) whether this place contain time information
 
 """
 
-import calendar
 import sqlite3
 import datetime
 import json
 import logging
 import math
-import re
-import ssl
-import threading
-import urllib.parse
-import urllib.request
-from queue import Queue
 from time import sleep, time
 
 import requests
