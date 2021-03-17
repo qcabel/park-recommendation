@@ -15,6 +15,7 @@ import json
 import logging
 import math
 from time import sleep, time
+import urllib.parse
 
 import requests
 from geopy import Point
@@ -24,6 +25,9 @@ logging.basicConfig(level=logging.INFO)
 
 # urls for google api web service
 BASE_URL = "https://maps.googleapis.com/maps/api/place/"
+SEARCH_URL = BASE_URL + ("findplacefromtext/json?input={}&inputtype=textquery&fields="
+                         "place_id,formatted_address,name,types,rating,opening_hours,geometry,business_status,icon,"
+                         "photos,plus_code,user_ratings_total,price_level&key={}")
 NEARBY_URL = BASE_URL + "nearbysearch/json?location={},{}&radius={}&types={}&key={}"
 
 
@@ -329,6 +333,15 @@ def get_radar(params, item):
         places.update(inner_results)
 
     return places
+
+
+def get_state_park_id(api_key, text):
+    search_str = SEARCH_URL.format(
+       urllib.parse.quote_plus(text), api_key
+    )
+    resp = json.loads(requests.get(search_str, auth=('user', 'pass')).text)
+
+    return resp
 
 
 def check_response_code(resp):
