@@ -124,13 +124,7 @@ def get_populartimes_by_place_details(detail) -> PopularTimes:
     return get_populartimes_by_name_addr(detail['name'], address)
 
 
-def get_populartimes_by_name_addr(name, address):
-    """
-    request information for a place and parse current popularity
-    :param name: name string
-    :param address: address string for checking if numbered address
-    :return:
-    """
+def build_populartimes_url(name, address):
     place_identifier = "{} {}".format(name, address)
 
     params_url = {
@@ -150,11 +144,12 @@ def get_populartimes_by_name_addr(name, address):
     }
 
     search_url = "https://www.google.de/search?" + "&".join(k + "=" + str(v) for k, v in params_url.items())
-    # logging.info("searchterm: " + search_url)
 
-    # noinspection PyUnresolvedReferences
-    resp = requests.get(search_url, headers=USER_AGENT, verify=False)
-    data = resp.text.split('/*""*/')[0]
+    return search_url
+
+
+def parse_populartimes(resp, address):
+    data = resp.split('/*""*/')[0]
 
     # find eof json
     jend = data.rfind("}")
@@ -202,3 +197,19 @@ def get_populartimes_by_name_addr(name, address):
         time_spent = [int(t) for t in time_spent]
 
     return PopularTimes(place_id, rating, rating_n, popular_times, current_popularity, time_spent)
+
+
+def get_populartimes_by_name_addr(name, address) -> PopularTimes:
+    """
+    request information for a place and parse current popularity
+    :param name: name string
+    :param address: address string for checking if numbered address
+    :return:
+    """
+    # logging.info("searchterm: " + search_url)
+    search_url = build_populartimes_url(name, address)
+
+    # noinspection PyUnresolvedReferences
+    resp = requests.get(search_url, headers=USER_AGENT, verify=False).text
+
+    return parse_populartimes(resp, address)
