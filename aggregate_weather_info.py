@@ -42,6 +42,8 @@ def json_file_to_df(json_file_name):
     df['datetime'] = df['datetimeEpoch'].apply(datetime.fromtimestamp)
 
     df['location'] = weather_data_partial['address']
+    df['latitude'] = weather_data_partial['latitude']
+    df['longitude'] = weather_data_partial['longitude']
 
     return df
 
@@ -49,7 +51,8 @@ def json_file_to_df(json_file_name):
 def main():
     parser = ArgumentParser("Aggregate weather json into dataframe parquet")
     parser.add_argument("--output-database", required=True, help="The database to store the results")
-    parser.add_argument("--input-folder", default='weather_data', help="The folder will be searched for partial weather data")
+    parser.add_argument("--input-folder", default='weather_data',
+                        help="The folder will be searched for partial weather data")
 
     args = parser.parse_args()
 
