@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map at zip</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- google maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=<api_key>&libraries=&v=weekly"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js" integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf" crossorigin="anonymous"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <style type="text/css">
+        /* set google map height */
+        #map {
+            height: 800px;
+        }
+
+        .taxon {
+            height: 25px;
+            width: 25px;
+        }
+        /* set pink bar */
+        .bg-pink {
+            background-color: #EF5FA7;
+        }
+        .border-pink {
+            border-color: #EF5FA7;
+        }
+        .text-pink {
+            color: #EF5FA7;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- header to show the project info -->
+    <div class="container p-0">
+        <nav class="navbar navbar-expand-lg navbar-light p-2" style="background-color: #e3f2fd;">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <img src="/static/logo.png" width="58" height="52" class="d-inline-block align-top" alt=""></a>
+<!--                    Outdoor Discovery</a>-->
+<!--                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">-->
+<!--                    <span class="navbar-toggler-icon"></span>-->
+<!--                </button>-->
+                <div class="collapse navbar-collapse d-flex justify-content-end" id="navbarNavAltMarkup">
+                    <div class="navbar-nav">
+                        <a class="nav-link active" aria-current="page" href="/static/park-rec-1.pdf">About</a>
+                        <a class="nav-link" aria-current="page" href="https://github.com/qcabel/park-recommendation">GitHub</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </div>
+
+    <!-- park rec service -->
+    <div class="container" id="app">
+        <!-- navbar -->
+        <div class="row mt-4">
+            <!-- first column to the left to have options -->
+            <div class="col-3 rounded py-2 overflow-scroll" style="background: #f8f9fa; height: 800px;">
+                <div id="input_zip">
+                    <!-- <p>User provided zip: {{ zipcode }}</p> -->
+                    <div class="mb-3">
+                        <label for="zipCodeText">Zip Code</label>
+                        <input type="text" class="form-control" v-model="zipcode">
+                        <div class="alert alert-danger" role="alert" v-if="errorMessage">
+                            {{ errorMessage }}
+                        </div>
+
+                        <!--
+                        <h5 class="mt-3">Features</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="checkDogFriendly">
+                            <label class="form-check-label" for="checkDogFriendly">
+                                Dog Friendly
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="checkHasPublicTransport">
+                            <label class="form-check-label" for="checkHasPublicTransport">
+                                Has public transport
+                            </label>
+                        </div>
+                        -->
+                    </div>
+                    <button class="btn btn-primary" v-on:click="updateMapCenter">Find my parks</button>
+                </div>
+
+                <div v-if="recommendedParks.length > 0">
+                    <ul class="list-group mt-2">
+                        <li class="list-group-item" v-for="(park, index) in topRecommendedParks"
+                            v-on:click="selectedPark = park">
+                            <div class="fw-bold"><span class="badge bg-dark">{{labels[index]}}</span> {{ park.name }}
+                                <span class="fw-light small">({{ park.distance.toFixed(1) }} mi)</span>
+                            </div>
+                            <div class="row d-flex" style="height: 24px;" v-for="name in ['traffic', 'diversity', 'rating']">
+                                <div class="col-4">
+                                    <span class="text-muted text-uppercase fw-lighter" style="font-size: 0.75rem;">{{ name }}</span>
+                                </div>
+                                <div class="col-6 align-self-center">
+                                    <div class="progress" style="height: 0.7em;">
+                                        <div v-bind:class="['progress-bar', colorOf(name)]"
+                                             v-bind:style="'width: ' + progressBarOf(park, name) + '%;'"
+                                             role="progressbar" v-bind:aria-valuenow="progressBarOf(park, name)"
+                                             aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="col-2">
+                                    <div>
+                                        <span class="badge ms-2 bg-primary" style="font-size: 0.6rem;">{{ (scoreOf(park, name) * 5.0).toFixed(1) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="rounded-circle bg-warning text-center d-table" style="font-size: 0.8rem; height: 60px; width: 60px;"
+                                     v-for="name in ['population', 'diversity', 'ratings']">
+                                    <div class="d-table-cell align-middle">
+                                        {{ park[name] || 0 }} <span style="font-size: 0.6rem;">/ 100</span>
+                                    </div>
+                                </div>
+                            </div>
+                            -->
+                            <div>
+                                <div class="btn-group me-1 mt-1" role="group" v-for="topic in topicsOf(park)">
+                                   <button type="button" class="btn btn-sm btn-outline-info p-1" v-for="topicName in topic.topics.slice(0, 2)">{{ topicName }}</button>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <!-- Map to the right side (10 col/12) -->
+            <div class="col-9 p-0 ps-3 position-relative" style="height: 760px;">
+                <div class="position-absolute top-0 start-0 h-95 my-auto w-400 card rounded p-2 ms-4 mt-2"
+                     style="width: 40%; height: 97%; z-index:100;" v-if="selectedPark">
+                    <div class="d-flex justify-content-between">
+                        <h5 class="mb-1">{{ selectedPark.name }}</h5>
+                        <button type="button" class="btn-close" aria-label="Close" v-on:click="selectedPark = null"></button>
+                    </div>
+                    <hr class="my-2">
+                    <div class="card border-primary">
+                        <div class="card-body text-primary">
+                            <h6>Uncrowded?</h6>
+                            <div id="uncrowdedness-plot">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card border-pink mt-2">
+                        <div class="card-body text-pink">
+                            <h6>Biodiversity</h6>
+                            <div class="fw-light">Total species: <span class="fw-bold">{{ selectedPark.species_count }}</span> </div>
+                            <table class="table table-sm">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Taxon</th>
+                                    <th scope="col">Observations</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr v-for="sc in speciesCountOf(selectedPark, 5)">
+                                    <td><img class="taxon" v-bind:src="sc.image"></td>
+                                    <td>{{ sc.count }}</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card border-warning mt-2">
+                        <div class="card-body text-warning">
+                            <h6>How other people rate this place</h6>
+                            <div class="fw-light">Rating: <span class="fw-bold">{{ selectedPark.rating }}</span> /5 </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+
+</body>
+</html>
+
+
+<script>
+    let map;
+    function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: {lat: 39.951374339596676, lng: -75.16472772264024},
+            zoom: 11,
+        });
+    }
+
+    // score a given park based on its attributes.
+    const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const species = [
+        'Aves', 'Reptilia', 'Mammalia', 'Insecta', 'Plantae', 'Fungi', 'Arachnida',
+        'Actinopterygii', 'Animalia', 'Amphibia', 'Mollusca', 'Protozoa', 'Chromista'
+    ]
+    const taxonImageUrl = 'https://raw.githubusercontent.com/inaturalist/inaturalist/main/app/assets/images/iconic_taxa/'
+
+    var zip = new Vue({
+        el: '#app',
+        data: {
+            zipcode: '',
+            // this is the data to represent all recommended parks by the backend service.
+            recommendedParks: [],
+            // all Google Map marker objects - which are to be deleted before the next rendering
+            currentMarkers: [],
+            selectedPark: null,
+            maxSpeciesDiversity: 0.0,
+            minPopularity: -999.0,
+            maxPopularity: -999.0,
+            maxPopScore: 0.0,
+            allParks: {},
+            parkTopics: {},
+            labels: labels,
+            errorMessage: null
+        },
+        mounted: function() {
+            this.loadParkTopics();
+            initMap();
+        },
+        watch: {
+            recommendedParks: function() {
+                // when the recommendedParks variable is updated, we need to re-render the
+                // markers
+                this.renderParks();
+            },
+            selectedPark: function () {
+                map.setCenter({lat: this.selectedPark.lat, lng: this.selectedPark.lng});
+                map.setZoom(12);
+                this.$nextTick(this.updateUncrowdednessPlot);
+
+            }
+        },
+        computed: {
+            topRecommendedParks: function() {
+                return this.recommendedParks.slice(0, 25)
+            },
+            uncrowdedIndex: function() {
+                return this.recommendedParks.map(p => p.traffic_norm * 100)
+            }
+        },
+        methods: {
+            updateUncrowdednessPlot() {
+                Plotly.purge('uncrowdedness-plot');
+
+                const trace = {
+                    x: this.uncrowdedIndex,
+                    type: 'histogram',
+                    marker: {color: 'gray',},
+                };
+                const data = [trace];
+                const layout = {
+                    xaxis: {
+                        title: 'Traffic index (--> uncrowded)'
+                    },
+                    height: 200,
+                    margin: {l: 20, r: 20, t: 20, b: 30},
+                    shapes: [{
+                        type: 'line',
+                        x0: this.selectedPark.traffic_norm * 100,
+                        y0: 0,
+                        x1: this.selectedPark.traffic_norm * 100,
+                        yref: 'paper',
+                        y1: 1,
+                        line: {
+                            color: 'blue',
+                            width: 2
+                        }
+                    }]
+                }
+                Plotly.newPlot('uncrowdedness-plot', data, layout);
+            },
+            scoringFunction(park) {
+                return park.total_score
+            },
+            topicsOf(park) {
+                return (this.parkTopics[park.id] || []).slice(0, 5)
+            },
+            speciesCountOf(park, n) {
+                const counts = species.map(s => {
+                    let speciesCount = park[s] || null
+                    if (speciesCount === null) speciesCount = 0.0
+
+                    return {name: s, image: taxonImageUrl + s.toLowerCase() + '-75px.png', count: speciesCount}
+                })
+                counts.sort((p1, p2) => p2.count - p1.count)
+                return counts.slice(0, n)
+            },
+            loadParkTopics() {
+                const self = this;
+                $.ajax({
+                    url: "/static/park_topics_by_id.json",
+                    dataType: "json"
+                }).done(function(resp) {
+                    self.parkTopics = resp;
+                })
+            },
+            scoreOf(park, name) {
+                if (name === 'traffic') {
+                    return park.traffic_norm
+                    // return park.pop_score / this.maxPopScore
+                } else if (name === 'diversity') {
+                    return park.species_count_norm
+                } else {
+                    return park.rating_norm
+                }
+            },
+            colorOf(name) {
+                if (name === 'traffic') {
+                    return 'bg-primary'
+                } else if (name === "rating") {
+                    return 'bg-warning'
+                } else {
+                    return 'bg-pink'
+                }
+            },
+            progressBarOf(park, name) {
+                return Math.round(this.scoreOf(park, name) * 100)
+            },
+            fetchRecommendedParks: function(nearestZipCode) {
+                let self = this;
+
+                $.ajax({
+                    url: "/recommend/" + nearestZipCode, // + '?maxdist=20',
+                    dataType: "json"
+                }).done(function(resp) {
+                    self.recommendedParks = resp
+                })
+
+            },
+            updateMapCenter: function() {
+                let self = this;
+
+                $.ajax({
+                    url: "/nearest_zip/" + this.zipcode,
+                    dataType: "json"
+                }).done(function(resp) {
+                    // lat/lng are returned as string
+                    if (resp.lat === undefined) {
+                        self.errorMessage = "No recommendations for " + self.zipcode + ", come back later! Meanwhile, feel free to try 19103 or 10011."
+                    } else {
+                        // reset error
+                        self.errorMessage = null;
+                        let coords = {'lat': parseFloat(resp.lat), 'lng': parseFloat(resp.lng)}
+                        map.setCenter(coords)
+                        map.setZoom(11)
+
+                        self.fetchRecommendedParks(resp.zipcode)
+                    }
+                });
+            },
+            renderParks: function () {
+                this.currentMarkers.forEach(marker => {
+                    // removes the marker from the map
+                    marker.setMap(null)
+                })
+                // render the parks here
+                // Construct the circle for each value in recommendedParks.
+                // scale the area of the circle based on the popularity.
+                const newMarkers = [];
+                // see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/entries
+                this.topRecommendedParks.forEach((park, index) => {
+                    // add circle to map
+                    const parkMarker = new google.maps.Marker({
+                        position: {lat: park.lat, lng: park.lng},
+                        label: labels[index % labels.length],
+                        title: park.name,
+                        map: map,
+                    });
+                    newMarkers.push(parkMarker)
+                })
+
+                // update this.currentMarkers so that we can remove them during next rendering
+                this.currentMarkers = newMarkers;
+            }
+        }
+    })
+</script>
