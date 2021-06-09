@@ -10,8 +10,9 @@ Google place IDs were first searched around the two cities `fetch_park_ids.py` a
 park details were acquired subsequently `fetch_details.py`. 
 Utility functions `get_id.py` were adapted from [PopularTimes](https://github.com/m-wrzr/populartimes). 
 
-Other information about these parks were gathered through FourSquare API `park_type_per_FourSquare_API.ipynb`, 
-iNaturalist API `inaturalist/explore_inaturalist_API.ipynb` (biodiversity)
+Other information about these parks were gathered through 
+[FourSquare Places API](https://developer.foursquare.com/docs/places-api/) `park_type_per_FourSquare_API.ipynb`, 
+[iNaturalist API](https://www.inaturalist.org/pages/api+reference) `inaturalist/explore_inaturalist_API.ipynb` (biodiversity)
 , and Wikipedia `get_PA_state_parks.ipynb` (state park information). 
 
 More attributes were extracted by analyzing over 200,000 Google Reviews through topic modeling (see `google_review/`). 
@@ -43,7 +44,7 @@ Heuristic ranking rules were used to rank the parks based on visitor **traffic**
 `parkFinderZip/parkrank.py`.
 
 
-### Part IV. Zip code based park filter and APP deployment
+### Part IV. Zip code based park filter and app deployment
 
 A subset of parks will be considered for ranking given the user provided zip code `find_zipcode_nearby_parks.ipynb`. 
 The web app interface can be found at `parkFinderZip/zipMap.html` and 
