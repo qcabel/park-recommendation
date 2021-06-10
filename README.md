@@ -26,17 +26,28 @@ Hourly bulk scrape jobs were set up to retrieve Google Maps Live Popularity data
 Observed weather information at the city address level paired with the live traffic data was gathered using 
 [visualcrossing](https://www.visualcrossing.com/weather-api) Timeline Weather API `get_weather_data.ipynb`
 
+Hourly data were aggregated in preparation for model training 
+`aggregate_curr_popularity_data.py` and `aggregate_weather_info.py`.
 
 ### Part II. Hourly visitor traffic estimation
 
 Random forest regression was used to estimate hourly visitor traffic for each park. 
 The individual park traffic is modeled as a random effect 
 with the goal to gauge the general popularity of the park 
-while regressing out effects of visiting time, weather, and park attributes
-(`prepare_dataframe_for_training.ipynb`). 
+while regressing out the effect of visiting time, weather, and park attributes
+(such as type, rating and average popular times). See `estimate_park_visitor_traffic.ipynb` for details. 
 
 In general, if a highly rated park has less visitor traffic comparing to a similar park, 
 it would be highly recommended.
+
+Although Google Maps Live Popularity provides reasonable signals on park visitor traffic, 
+the caveat of using it as a somewhat "ground truth" is also obvious. 
+Since it's not the raw data that is provided here, 
+when Google adjusts its way of normalizing such measure,
+the same values across two months are not necessarily indicating the same traffic.
+For example, at the beginning of May, most of the Live Popularity data were clapped between 0 and 100, 
+which was not the case previously. 
+To account for this change, only data before May 5th were used in model fitting. 
 
 ### Part III. Park rank
 
@@ -47,5 +58,8 @@ Heuristic ranking rules were used to rank the parks based on visitor **traffic**
 ### Part IV. Zip code based park filter and app deployment
 
 A subset of parks will be considered for ranking given the user provided zip code `find_zipcode_nearby_parks.ipynb`. 
+The app is available for 1146 unique zip codes near the region of Philadelphia and New York City. 
+Candidate parks are within 40 miles of the zip code, and first 25 recommended parks are shown. 
+
 The web app interface can be found at `parkFinderZip/zipMap.html` and 
 deployed through Flask `parkFinderZip/park_finder_server.py`.
